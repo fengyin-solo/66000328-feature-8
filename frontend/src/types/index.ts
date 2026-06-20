@@ -45,3 +45,16 @@ export interface MoleculeData {
   atoms: Atom3D[]
   bonds: Bond3D[]
 }
+
+export interface ViewerState {
+  rotationX: number
+  rotationY: number
+  cameraZ: number
+}
+
+export interface HistoryEntry {
+  molecule: MoleculeData
+  admet: ADMETProps
+  viewerState: ViewerState
+  viewedAt: number
+}

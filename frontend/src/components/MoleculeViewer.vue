@@ -30,6 +30,8 @@ const containerRef = ref<HTMLDivElement | null>(null)
 let scene: THREE.Scene | null = null
 let renderer: THREE.WebGLRenderer | null = null
 let animationId: number | null = null
+let groupRef: THREE.Group | null = null
+let cameraRef: THREE.PerspectiveCamera | null = null
 
 function initThree() {
   const container = containerRef.value
@@ -38,6 +40,7 @@ function initThree() {
   scene.background = new THREE.Color(0x0f172a)
   const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000)
   camera.position.set(0, 0, 10)
+  cameraRef = camera
   const ambLight = new THREE.AmbientLight(0xffffff, 0.6)
   scene.add(ambLight)
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.8)
@@ -50,11 +53,12 @@ function initThree() {
 
   const group = new THREE.Group()
   scene.add(group)
+  groupRef = group
 
   let isDragging = false
   let prevX = 0, prevY = 0
   container.addEventListener('mousedown', (e) => { isDragging = true; prevX = e.clientX; prevY = e.clientY })
-  container.addEventListener('mouseup', () => { isDragging = false })
+  container.addEventListener('mouseup', () => { isDragging = false; recordState() })
   container.addEventListener('mousemove', (e) => {
     if (!isDragging) return
     group.rotation.y += (e.clientX - prevX) * 0.01
@@ -64,6 +68,7 @@ function initThree() {
   container.addEventListener('wheel', (e) => {
     e.preventDefault()
     camera.position.z = Math.max(3, Math.min(30, camera.position.z + e.deltaY * 0.01))
+    recordState()
   })
 
   function animate() {
@@ -75,9 +80,26 @@ function initThree() {
   return { group, camera }
 }
 
+function recordState() {
+  if (!groupRef || !cameraRef) return
+  store.recordViewerState({
+    rotationX: groupRef.rotation.x,
+    rotationY: groupRef.rotation.y,
+    cameraZ: cameraRef.position.z
+  })
+}
+
+function restoreViewerState() {
+  if (!groupRef || !cameraRef) return
+  const state = store.viewerState
+  groupRef.rotation.x = state.rotationX
+  groupRef.rotation.y = state.rotationY
+  cameraRef.position.z = state.cameraZ
+}
+
 function renderMolecule() {
   if (!scene || !store.currentMolecule) return
-  const group = scene.children.find(c => c.type === 'Group')
+  const group = scene.children.find(c => c.type === 'Group') as THREE.Group
   if (!group) return
   while (group.children.length > 0) group.remove(group.children[0])
 
@@ -111,12 +133,13 @@ function renderMolecule() {
     mesh.rotateX(Math.PI / 2)
     group.add(mesh)
   })
+
+  restoreViewerState()
 }
 
 watch(() => store.currentMolecule, () => renderMolecule())
 
 onUnmounted(() => { if (animationId) cancelAnimationFrame(animationId) })
 
-// Initialize when container is ready
 setTimeout(() => { initThree(); renderMolecule() }, 100)
 </script>
